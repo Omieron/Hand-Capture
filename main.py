@@ -6,6 +6,7 @@ import urllib.request
 import os
 import time
 import threading
+from gestures import detect_gesture, ALL_GESTURES
 
 MODEL_PATH = "hand_landmarker.task"
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
@@ -49,8 +50,11 @@ options = vision.HandLandmarkerOptions(
 )
 
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+cv2.namedWindow("Hand Capture", cv2.WINDOW_NORMAL)
+cv2.setWindowProperty("Hand Capture", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 fps_time = time.time()
 fps = 0
@@ -75,17 +79,58 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
         # landmark koordinatlarını orijinal frame boyutuna ölçekle
         if current_landmarks:
             h, w = frame.shape[:2]
-            for hand_landmarks in current_landmarks:
+            for i, hand_landmarks in enumerate(current_landmarks):
                 points = [(int(lm.x * w), int(lm.y * h)) for lm in hand_landmarks]
                 for start, end in HAND_CONNECTIONS:
                     cv2.line(frame, points[start], points[end], (0, 255, 0), 2)
                 for point in points:
                     cv2.circle(frame, point, 4, (0, 0, 255), -1)
 
+                gesture = detect_gesture(hand_landmarks)
+                if gesture:
+                    x, y = points[0]
+                    cv2.putText(frame, gesture, (x - 30, y - 20),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
         fps = 1 / (time.time() - fps_time)
         fps_time = time.time()
         cv2.putText(frame, f"FPS: {int(fps)}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+
+        h, w = frame.shape[:2]
+        with lock:
+            current_for_panel = list(latest_landmarks)
+
+        detected = []
+        for hand_landmarks in current_for_panel:
+            g = detect_gesture(hand_landmarks)
+            if g:
+                detected.append(g)
+        active = detected[0] if detected else None
+
+        # Sag alt: aktif hareket
+        panel_text = active if active else "No hand"
+        (tw, th), _ = cv2.getTextSize(panel_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
+        pad = 12
+        rx1, ry1 = w - tw - pad * 2 - 10, h - th - pad * 2 - 10
+        rx2, ry2 = w - 10, h - 10
+        cv2.rectangle(frame, (rx1, ry1), (rx2, ry2), (0, 0, 0), -1)
+        cv2.rectangle(frame, (rx1, ry1), (rx2, ry2), (255, 255, 255), 1)
+        cv2.putText(frame, panel_text, (rx1 + pad, ry2 - pad),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+
+        # Ust sol: gesture listesi
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        line_h = 28
+        list_x = 10
+        list_y_start = 60
+        label = "Gestures:"
+        cv2.putText(frame, label, (list_x, list_y_start), font, 0.6, (200, 200, 200), 1)
+        for idx, name in enumerate(ALL_GESTURES):
+            y = list_y_start + (idx + 1) * line_h
+            color = (0, 255, 0) if name == active else (180, 180, 180)
+            prefix = "> " if name == active else "  "
+            cv2.putText(frame, prefix + name, (list_x, y), font, 0.65, color, 1 if name != active else 2)
 
         cv2.imshow("Hand Capture", frame)
 
