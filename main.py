@@ -6,7 +6,7 @@ import urllib.request
 import os
 import time
 import threading
-from gestures import detect_gesture, ALL_GESTURES
+from gestures import smooth_gesture, ALL_GESTURES
 
 MODEL_PATH = "hand_landmarker.task"
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
@@ -86,7 +86,7 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
                 for point in points:
                     cv2.circle(frame, point, 4, (0, 0, 255), -1)
 
-                gesture = detect_gesture(hand_landmarks)
+                gesture = smooth_gesture(hand_landmarks)
                 if gesture:
                     x, y = points[0]
                     cv2.putText(frame, gesture, (x - 30, y - 20),
@@ -103,7 +103,7 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
 
         detected = []
         for hand_landmarks in current_for_panel:
-            g = detect_gesture(hand_landmarks)
+            g = smooth_gesture(hand_landmarks)
             if g:
                 detected.append(g)
         active = detected[0] if detected else None
