@@ -19,7 +19,7 @@ def get_finger_states(landmarks):
     pips = [3, 6, 10, 14, 18]
 
     # Başparmak: elin yönüne göre
-    wrist = landmarks[0]
+    wrist     = landmarks[0]
     index_mcp = landmarks[5]
     hand_facing_right = index_mcp.x > wrist.x
     if hand_facing_right:
