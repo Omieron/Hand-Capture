@@ -29,12 +29,13 @@ print(f"Veri: {len(X)} örnek, {len(le.classes_)} sınıf")
 print(f"Sınıflar: {list(le.classes_)}\n")
 
 # Cross-validation
-model = RandomForestClassifier(n_estimators=200, max_depth=None, random_state=42, n_jobs=-1)
+model = RandomForestClassifier(n_estimators=50, max_depth=None, random_state=42, n_jobs=-1)
 scores = cross_val_score(model, X, y_enc, cv=5, scoring="accuracy")
 print(f"5-Fold CV doğruluk: {scores.mean():.3f} ± {scores.std():.3f}")
 
 # Tam veriyle eğit
 X_train, X_test, y_train, y_test = train_test_split(X, y_enc, test_size=0.2, random_state=42, stratify=y_enc)
+model = RandomForestClassifier(n_estimators=50, max_depth=None, random_state=42, n_jobs=-1)
 model.fit(X_train, y_train)
 
 y_pred = model.predict(X_test)

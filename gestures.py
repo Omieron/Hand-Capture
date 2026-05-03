@@ -15,7 +15,7 @@ ALL_GESTURES = [
     "OK",
 ]
 
-_buffer = deque(maxlen=12)
+_buffer = deque(maxlen=8)   # 12'den 8'e indirdik: daha hızlı tepki
 
 # ML modeli varsa yükle
 _ml = None
@@ -36,20 +36,17 @@ def _extract_features(landmarks):
 
 
 def _ml_detect(landmarks):
-    if _ml is None:
-        return ""
     feats = _extract_features(landmarks)
     if feats is None:
         return ""
     model, le = _ml
     proba = model.predict_proba([feats])[0]
     best  = int(np.argmax(proba))
-    if proba[best] < 0.55:   # düşük güven → boş döndür
+    if proba[best] < 0.50:
         return ""
     return le.inverse_transform([best])[0]
 
 
-# Kural tabanlı algılama (fallback / karşılaştırma için tutuluyor)
 def get_finger_states(landmarks):
     tips = [4, 8, 12, 16, 20]
     pips = [3, 6, 10, 14, 18]
@@ -86,10 +83,21 @@ def detect_gesture(landmarks):
 
 
 def smooth_gesture(landmarks):
-    raw = _ml_detect(landmarks) if _ml else detect_gesture(landmarks)
+    # Kural tabanlı her frame çalışır (anlık, hızlı)
+    rule = detect_gesture(landmarks)
+
+    if _ml:
+        # ML her frame çalışır — 50 ağaç yeterince hızlı
+        ml = _ml_detect(landmarks)
+        # Kural bir şey yakaladıysa onu kullan (güvenilir + hızlı)
+        # Kural boşsa ML'e bak (belirsiz pozisyonlar için)
+        raw = rule if rule else ml
+    else:
+        raw = rule
+
     _buffer.append(raw)
 
-    if len(_buffer) < 6:
+    if len(_buffer) < 4:
         return raw
 
     counts = {}
@@ -97,6 +105,7 @@ def smooth_gesture(landmarks):
         counts[g] = counts.get(g, 0) + 1
 
     best = max(counts, key=counts.get)
-    if counts[best] >= len(_buffer) * 0.6 and best != "":
+    # Eşik %55 → daha hızlı geçiş
+    if counts[best] >= len(_buffer) * 0.55 and best != "":
         return best
     return ""
